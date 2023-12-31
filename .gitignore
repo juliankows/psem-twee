@@ -1,7 +1,5 @@
-target/
-sample.twee
-
-
-# Added by cargo
-
 /target
+sample.twee
+out/
+in/
+

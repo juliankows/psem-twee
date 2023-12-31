@@ -1,23 +1,19 @@
 use std::{
-	collections::{BTreeMap, HashMap},
-	fs::File,
+	collections::BTreeMap,
+	fs::{self, File},
 	io::{BufRead, BufReader},
 	path::PathBuf,
+	process::Command,
 };
 
 use anyhow::Result;
 use itertools::Itertools;
-use video_rs::{Decoder, Encoder, EncoderSettings, Locator, Options};
-
-#[derive(Debug)]
-struct Block {
-	title: String,
-	content: String,
-}
+use serde::Serialize;
 
 type BlockId = String;
 
-struct BlockConfig {
+#[derive(Serialize, Debug)]
+struct Block {
 	title: String,
 	text_content: String,
 	links: Vec<BlockId>,
@@ -34,17 +30,22 @@ fn main() -> Result<()> {
 		println!("{}", l.text_content);
 		println!("linked to {:?}", l.links);
 	}
-	process_blocks(blocks);
+	fs::create_dir_all("out")?;
+	{
+		let blocks = serde_json::to_string(&blocks)?;
+		fs::write("out/config.json", blocks)?;
+	}
+	process_blocks(blocks)?;
 	Ok(())
 }
-fn read_twee(rdr: impl Iterator<Item = String>) -> BTreeMap<String, BlockConfig> {
+fn read_twee(rdr: impl Iterator<Item = String>) -> BTreeMap<String, Block> {
 	rdr.map(|x| x.trim().to_string())
 		.group_by(|x| x.starts_with("::"))
 		.into_iter()
 		.map(|x| -> Vec<String> { x.1.collect() })
 		.tuples()
 		.filter(|(t, _)| {
-			!t.contains(&"StoryData".to_string()) && !t.contains(&"StoryTitle".to_string())
+			!(t[0].contains(&"StoryData".to_string()) || t[0].contains(&"StoryTitle".to_string()))
 		})
 		.map(|(t, c)| {
 			let t = t[0]
@@ -66,7 +67,7 @@ fn read_twee(rdr: impl Iterator<Item = String>) -> BTreeMap<String, BlockConfig>
 				.collect();
 			(
 				t.clone(),
-				BlockConfig {
+				Block {
 					title: t,
 					text_content: content.join("\n"),
 					links,
@@ -75,10 +76,10 @@ fn read_twee(rdr: impl Iterator<Item = String>) -> BTreeMap<String, BlockConfig>
 		})
 		.collect()
 }
-fn process_blocks(blocks: BTreeMap<String, BlockConfig>) -> Result<()> {
+fn process_blocks(blocks: BTreeMap<String, Block>) -> Result<()> {
 	let paths: Vec<PathBuf> = blocks
 		.keys()
-		.map(|x| PathBuf::from(format!("{x}.mp4")))
+		.map(|x| PathBuf::from(format!("in/{x}.mp4")))
 		.collect();
 	//if paths.iter().any(|x| !x.exists()) {
 	//	paths
@@ -93,31 +94,17 @@ fn process_blocks(blocks: BTreeMap<String, BlockConfig>) -> Result<()> {
 		println!("transcoding {}", p.display());
 		let p2 = p.clone();
 		let basename = p2.file_stem().unwrap().to_str().unwrap();
-
-		let src: Locator = p.into();
-		let mut dec = Decoder::new(&src).unwrap();
-
-		let dest: Locator = PathBuf::from(format!("out/{}.mpd", basename)).into();
-		let options = Options::new_from_hashmap(&HashMap::from([
-			("seg_duration".to_string(), "1".to_string()),
-			(format!("b"), format!("500k")),
-		]));
-		let (width, height) = dec.size_out();
-		let settings = EncoderSettings::for_h264_custom(
-			width as usize,
-			height as usize,
-			video_rs::ffmpeg::format::Pixel::YUV420P,
-			Options::new_from_hashmap(&HashMap::from([
-				("preset".to_string(), "medium".to_string()),
-				("b".to_string(), format!("500k")),
-			])),
-		);
-		let mut enc = Encoder::new_with_options(&dest, settings, &options).unwrap();
-
-		for fr in dec.decode_raw_iter() {
-			enc.encode_raw(fr?)?;
-		}
-		enc.finish()?;
+		fs::create_dir_all(format!("out/files/{basename}"))?;
+		Command::new("ffmpeg")
+			.arg("-i")
+			.arg(format!("{}", p.display()))
+			.arg("-f")
+			.arg("dash")
+			.arg("-window_size")
+			.arg("0")
+			.arg(format!("out/files/{basename}/manifest.mpd"))
+			.spawn()?
+			.wait()?;
 	}
 	Ok(())
 }
