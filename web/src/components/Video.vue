@@ -28,6 +28,7 @@ async function getConfig() {
 function select(target) {
 	history.value.push(target)
 	file.value = target;
+	showButtons.value = false;
 	player.initialize(document.getElementById("player"), `/files/${file.value}/manifest.mpd`, false);
 	player.on("playbackTimeUpdated", (ev) => {
 		let btn_dur = player.duration() > 5 ? 5 : player.duration() * .1
