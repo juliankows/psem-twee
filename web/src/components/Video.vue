@@ -8,12 +8,16 @@ let buttons = ref([]);
 let showButtons = ref(false);
 let history = ref([]);
 
+let first_interaction = true;
+
 let player = dashjs.MediaPlayer().create();
 let config = await getConfig();
 
 watch(file, (f) => {
 	if (!f) return;
-	buttons.value = config[f].links;
+	setTimeout(() => {
+		buttons.value = config[f].links;
+	}, 510) // wait for the animation
 })
 
 async function getConfig() {
@@ -26,7 +30,7 @@ function select(target) {
 	file.value = target;
 	player.initialize(document.getElementById("player"), `/files/${file.value}/manifest.mpd`, false);
 	player.on("playbackTimeUpdated", (ev) => {
-		let btn_dur = player.duration() > 15 ? 15 : player.duration() * .1
+		let btn_dur = player.duration() > 5 ? 5 : player.duration() * .1
 		showButtons.value = ev.timeToEnd < btn_dur
 		//if (ev.timeToEnd <= 0.5) {
 		//	setTimeout(() => {
@@ -35,7 +39,9 @@ function select(target) {
 		//	}, 500)
 		//}
 	})
-	player.play();
+	if (!first_interaction) // don't play on first page load
+		player.play();
+	first_interaction = false
 }
 
 function back() {
@@ -66,12 +72,18 @@ onMounted(() => { select("Intro") })
 .buttons {
 	position: fixed;
 	width: 100vw;
-	bottom: 4rem;
+	bottom: 0rem;
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(25vw, 1fr));
 	grid-auto-flow: column;
 	opacity: 0;
 	transition: all 0.5s ease;
+	margin: 0;
+	padding: 0;
+}
+
+.buttons:not(.show) {
+	pointer-events: none;
 }
 
 .back {
@@ -87,6 +99,7 @@ onMounted(() => { select("Intro") })
 
 .buttons.show {
 	opacity: 1;
+	bottom: 4rem;
 }
 
 .btn {
