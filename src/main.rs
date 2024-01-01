@@ -52,8 +52,8 @@ fn main() -> Result<()> {
 		let blocks = serde_json::to_string(&blocks)?;
 		fs::write("out/config.json", blocks)?;
 	}
-	process_blocks(blocks)?;
 	embed::write_assets()?;
+	process_blocks(blocks)?;
 	Ok(())
 }
 fn read_twee(rdr: impl Iterator<Item = String>) -> BTreeMap<String, Block> {
