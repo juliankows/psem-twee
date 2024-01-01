@@ -1,14 +1,17 @@
 use std::{
 	collections::BTreeMap,
+	env,
 	fs::{self, File},
 	io::{BufRead, BufReader},
 	path::PathBuf,
-	process::Command,
+	process::{self, Command},
 };
 
 use anyhow::Result;
 use itertools::Itertools;
 use serde::Serialize;
+
+mod embed;
 
 type BlockId = String;
 
@@ -20,7 +23,21 @@ struct Block {
 }
 
 fn main() -> Result<()> {
-	let f = File::open("sample.twee")?;
+	let args: Vec<String> = env::args().collect();
+	let twee_file: PathBuf = match args.get(1) {
+		Some(t) => t,
+		None => {
+			println!("!! no .twee file as argument");
+			println!("usage: {} <twee file>", args[0]);
+			process::exit(1);
+		}
+	}
+	.into();
+	if !twee_file.exists() {
+		println!("file {} does not exist!", twee_file.display());
+		process::exit(2);
+	}
+	let f = File::open(twee_file)?;
 	let rdr = BufReader::new(f);
 	let blocks = read_twee(rdr.lines().filter_map(|x| x.ok()));
 
@@ -36,6 +53,7 @@ fn main() -> Result<()> {
 		fs::write("out/config.json", blocks)?;
 	}
 	process_blocks(blocks)?;
+	embed::write_assets()?;
 	Ok(())
 }
 fn read_twee(rdr: impl Iterator<Item = String>) -> BTreeMap<String, Block> {
@@ -95,7 +113,11 @@ fn process_blocks(blocks: BTreeMap<String, Block>) -> Result<()> {
 		let p2 = p.clone();
 		let basename = p2.file_stem().unwrap().to_str().unwrap();
 		fs::create_dir_all(format!("out/files/{basename}"))?;
-		Command::new("ffmpeg")
+		#[cfg(target_os = "linux")]
+		let ffmpeg = "ffmpeg";
+		#[cfg(target_os = "windows")]
+		let ffmpeg = ".\\ffmpeg.exe";
+		Command::new(ffmpeg)
 			.arg("-i")
 			.arg(format!("{}", p.display()))
 			.arg("-f")
