@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.77"
+clap = { version = "4.5.10", features = ["derive"] }
 itertools = "0.12.0"
 rust-embed = "8.2.0"
 serde = { version = "1.0.193", features = ["derive"] }

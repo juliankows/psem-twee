@@ -60,7 +60,8 @@ onMounted(() => { select("Intro") })
 	</video>
 	<div class="buttons" :class="{ show: showButtons }">
 		<button class="back" @click="back">Zurück</button>
-		<button class="btn" v-for="b of buttons" @click="select(b)">{{ b }}</button>
+		<button class="back" @click="select('Intro')">Zum Anfang</button>
+		<button class="btn" v-for="b of buttons" @click="select(b.target)">{{ b.text }}</button>
 	</div>
 </template>
 

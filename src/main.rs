@@ -1,3 +1,4 @@
+use clap::{ArgAction, Parser};
 use std::{
 	collections::BTreeMap,
 	env,
@@ -19,20 +20,39 @@ type BlockId = String;
 struct Block {
 	title: String,
 	text_content: String,
-	links: Vec<BlockId>,
+	links: Vec<Link>,
+}
+
+#[derive(Serialize, Debug)]
+struct Link {
+	text: String,
+	target: BlockId,
+}
+
+#[derive(Parser)]
+struct Arguments {
+	file: PathBuf,
+	/// process the video files for use with the player
+	#[arg(short = 'n', long = "no-process-video", default_value_t = true, action = ArgAction::SetFalse)]
+	do_processing: bool,
+
+	#[arg(short = 'e', long = "video-ext", default_value = "mp4")]
+	video_ext: String,
 }
 
 fn main() -> Result<()> {
-	let args: Vec<String> = env::args().collect();
-	let twee_file: PathBuf = match args.get(1) {
-		Some(t) => t,
-		None => {
-			println!("!! no .twee file as argument");
-			println!("usage: {} <twee file>", args[0]);
-			process::exit(1);
-		}
-	}
-	.into();
+	let args = Arguments::parse();
+	//let args: Vec<String> = env::args().collect();
+	//let twee_file: PathBuf = match args.get(1) {
+	//	Some(t) => t,
+	//	None => {
+	//		println!("!! no .twee file as argument");
+	//		println!("usage: {} <twee file>", args[0]);
+	//		process::exit(1);
+	//	}
+	//}
+	//.into();
+	let twee_file = args.file;
 	if !twee_file.exists() {
 		println!("file {} does not exist!", twee_file.display());
 		process::exit(2);
@@ -53,7 +73,9 @@ fn main() -> Result<()> {
 		fs::write("out/config.json", blocks)?;
 	}
 	embed::write_assets()?;
-	process_blocks(blocks)?;
+	if args.do_processing {
+		process_blocks(blocks, &args.video_ext)?;
+	}
 	Ok(())
 }
 fn read_twee(rdr: impl Iterator<Item = String>) -> BTreeMap<String, Block> {
@@ -75,12 +97,30 @@ fn read_twee(rdr: impl Iterator<Item = String>) -> BTreeMap<String, Block> {
 				.to_string();
 			let (links, content): (Vec<String>, Vec<String>) =
 				c.into_iter().partition(|x| x.starts_with("[["));
-			let links: Vec<String> = links
+			let links: Vec<Link> = links
 				.into_iter()
 				.map(|x| {
-					x.trim_start_matches("[[")
-						.trim_end_matches("]]")
-						.to_string()
+					let lt = x.split_once("]] ");
+					match lt {
+						Some((link, text)) => {
+							let link = link.trim_start_matches("[[").trim_end_matches("]]");
+							let text = text.trim();
+							Link {
+								target: link.to_string(),
+								text: text.to_string(),
+							}
+						}
+						None => {
+							let link = x
+								.trim_start_matches("[[")
+								.trim_end_matches("]]")
+								.to_string();
+							Link {
+								target: link.to_string(),
+								text: link.to_string(),
+							}
+						}
+					}
 				})
 				.collect();
 			(
@@ -94,10 +134,10 @@ fn read_twee(rdr: impl Iterator<Item = String>) -> BTreeMap<String, Block> {
 		})
 		.collect()
 }
-fn process_blocks(blocks: BTreeMap<String, Block>) -> Result<()> {
+fn process_blocks(blocks: BTreeMap<String, Block>, video_ext: &str) -> Result<()> {
 	let paths: Vec<PathBuf> = blocks
 		.keys()
-		.map(|x| PathBuf::from(format!("in/{x}.mp4")))
+		.map(|x| PathBuf::from(format!("in/{x}.{video_ext}")))
 		.collect();
 	//if paths.iter().any(|x| !x.exists()) {
 	//	paths
