@@ -16,7 +16,8 @@ let config = await getConfig();
 watch(file, (f) => {
 	if (!f) return;
 	setTimeout(() => {
-		buttons.value = config[f].links;
+		buttons.value = config[f];
+		console.log(buttons.value)
 	}, 510) // wait for the animation
 })
 
@@ -59,9 +60,14 @@ onMounted(() => { select("Intro") })
 	<video id="player" controls>
 	</video>
 	<div class="buttons" :class="{ show: showButtons }">
-		<button class="back" @click="back">Zurück</button>
-		<button class="back" @click="select('Intro')">Zum Anfang</button>
-		<button class="btn" v-for="b of buttons" @click="select(b.target)">{{ b.text }}</button>
+		<h1>{{ buttons.text_content }}</h1>
+		<div class="back">
+			<button class="back" @click="back">Zurück</button>
+			<button class="back" @click="select('Intro')">Zum Anfang</button>
+		</div>
+		<div class="links">
+			<button class="btn" v-for="b of buttons.links" @click="select(b.target)">{{ b.text }}</button>
+		</div>
 	</div>
 </template>
 
@@ -75,13 +81,23 @@ onMounted(() => { select("Intro") })
 	position: fixed;
 	width: 100vw;
 	bottom: 0rem;
-	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(25vw, 1fr));
-	grid-auto-flow: column;
 	opacity: 0;
 	transition: all 0.5s ease;
 	margin: 0;
 	padding: 0;
+}
+
+h1 {
+	color: white;
+	text-align: center;
+	font-family: sans-serif;
+}
+
+.links {
+
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(25vw, 1fr));
+	grid-auto-flow: column;
 }
 
 .buttons:not(.show) {
